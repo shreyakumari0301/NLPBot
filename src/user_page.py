@@ -185,15 +185,22 @@ USER_PAGE_HTML = """<!DOCTYPE html>
       } catch (e) {}
     }
 
+    let ttsStartTime = 0;
+    const GRACE_MS = 1200;
+
     function speak(text, onEnd) {
       if (!synth || !text) { if (onEnd) onEnd(); return; }
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
       const voice = getFemaleVoice();
       if (voice) u.voice = voice;
-      u.rate = 0.95;
+      u.rate = 0.9;
       u.pitch = 1.05;
-      u.onend = () => { if (onEnd) onEnd(); };
+      ttsStartTime = Date.now();
+      u.onend = () => {
+        setStatus('Mira is speaking…', 'speaking');
+        setTimeout(function() { if (onEnd) onEnd(); }, 300);
+      };
       u.onerror = () => { if (onEnd) onEnd(); };
       synth.speak(u);
       callState = STATE.SPEAKING;
@@ -215,6 +222,7 @@ USER_PAGE_HTML = """<!DOCTYPE html>
       const t = (transcript || '').trim();
       setYouSaid(t || '(no words captured)');
       if (!t) return;
+      if (callState === STATE.SPEAKING && (Date.now() - ttsStartTime) < GRACE_MS) return;
       if (callState === STATE.SPEAKING) synth.cancel();
       callState = STATE.PROCESSING;
       setStatus('Thinking…');
@@ -238,16 +246,16 @@ USER_PAGE_HTML = """<!DOCTYPE html>
     }
 
     async function startCall() {
-      if (!SpeechRecognition) {
-        setStatus('Voice not supported.');
-        noVoiceMsg.style.display = 'block';
-        return;
-      }
       setStatus('Connecting…');
       try {
         const r = await fetch('/live/start', { method: 'POST' });
         const d = await r.json();
         sessionId = d.session_id;
+        if (!SpeechRecognition) {
+          setStatus('Voice not supported.');
+          noVoiceMsg.style.display = 'block';
+          return;
+        }
         if (d.bot_reply) {
           speak(d.bot_reply, () => { startListening(); });
         } else {

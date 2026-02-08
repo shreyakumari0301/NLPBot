@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from src.live.faq import get_faq_reply, LOOKING_FOR_ANIMATION_ANSWER, SERVICES_ANSWER
+from src.live.faq import get_faq_reply, get_faq_reply_varied, LOOKING_FOR_ANIMATION_ANSWER, SERVICES_ANSWER
 from src.live.llm_chat import get_llm_reply
 from src.live.quotation_flow import (
     extract_price_from_message,
@@ -105,6 +105,19 @@ def turn(session_id: str, user_message: str) -> tuple[str, ConversationState, st
         _sessions[session_id] = data
         return reply, state, "general_services_query"
 
+    # Quotation request: handle before LLM so "I want a quotation" always creates request
+    if user_asks_for_quote(user_message):
+        q = get_quotation_by_session(session_id)
+        if not q or q["status"] in ("agreed", "rejected"):
+            req_id = create_quotation_request(session_id)
+            data["quotation_request_id"] = req_id
+            reply = QUOTE_FEW_MINUTES
+            data["history"].append({"role": "user", "text": user_message})
+            data["history"].append({"role": "bot", "text": reply})
+            data["turn_index"] = turn_index + 1
+            _sessions[session_id] = data
+            return reply, state, "price_estimation"
+
     # LLM reply: capture what user said and respond naturally (LangChain)
     llm_reply = get_llm_reply(data["history"], user_message)
     if llm_reply:
@@ -118,6 +131,10 @@ def turn(session_id: str, user_message: str) -> tuple[str, ConversationState, st
     intent = intent_result.primary_intent
     confidence = intent_result.confidence
 
+        # Acknowledge so the bot clearly responds to what they said (no same line again)
+    def _ack_then(s: str) -> str:
+        return f"Got it — {s}" if (user_message or "").strip() else s
+
     # Sim 4 – Unknown/chitchat: short greeting → brief reply; else try FAQ, then varied clarification
     if intent == "unknown_chitchat":
         _m = _msg.strip()
@@ -126,24 +143,25 @@ def turn(session_id: str, user_message: str) -> tuple[str, ConversationState, st
         else:
             faq = get_faq_reply(user_message)
             if faq:
-                reply = faq
+                reply = _ack_then(faq)
             else:
                 _clarify = (
                     "What can I help you with today — a quote, our services, or something else?",
                     "I'd love to help. Are you looking for animation work, a price, or general info?",
                     "How can I help you — quote, 2D/3D work, or something else?",
                 )
-                reply = _clarify[turn_index % len(_clarify)]
+                reply = _ack_then(_clarify[turn_index % len(_clarify)])
         data["history"].append({"role": "user", "text": user_message})
         data["history"].append({"role": "bot", "text": reply})
         data["turn_index"] = turn_index + 1
         _sessions[session_id] = data
         return reply, state, intent
 
-    # Sim 2 – General services query → "Sure, go ahead" if interrupted mid-flow, else FAQ
+    # Sim 2 – General services query → varied FAQ; always acknowledge so we answer to what they said
     if intent == "general_services_query":
-        faq = get_faq_reply(user_message)
-        reply = (GO_AHEAD + " " + faq) if state.last_question_asked else (faq or SERVICES_ANSWER)
+        faq = get_faq_reply_varied(user_message, turn_index) or get_faq_reply(user_message)
+        base = (GO_AHEAD + " " + (faq or "")) if state.last_question_asked else (faq or "We do such projects — animation, short films, ads. What would you like to go for?")
+        reply = _ack_then(base)
         data["history"].append({"role": "user", "text": user_message})
         data["history"].append({"role": "bot", "text": reply})
         data["turn_index"] = turn_index + 1

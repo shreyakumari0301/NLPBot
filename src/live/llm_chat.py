@@ -16,20 +16,24 @@ def _get_chat():
         return None
     if _chat is not None:
         return _chat
-    # 1) Prefer local Ollama (Mistral / LLaMA-3 / Phi-3)
-    if os.environ.get("USE_OLLAMA", "").lower() in ("1", "true", "yes"):
+    use_ollama_env = os.environ.get("USE_OLLAMA", "").lower()
+    ollama_disabled = use_ollama_env in ("0", "false", "no")
+
+    # 1) Ollama: use if USE_OLLAMA=1 or if not disabled and no OpenAI key (default to local)
+    if not ollama_disabled:
         try:
             from langchain_community.chat_models import ChatOllama
 
             _chat = ChatOllama(
                 model=os.environ.get("OLLAMA_MODEL", "mistral"),
-                temperature=0.7,
+                temperature=0.8,
             )
             _llm_available = True
             return _chat
         except Exception:
             pass
-    # 2) OpenAI (gpt-4o-mini)
+
+    # 2) OpenAI (gpt-4o-mini) when OPENAI_API_KEY set or USE_OLLAMA=0
     try:
         from langchain_openai import ChatOpenAI
 
@@ -49,17 +53,14 @@ def _get_chat():
         return None
 
 
-SYSTEM_PROMPT = """You are Mira, a friendly voice assistant for XYZ Animations — an animation and video production company.
+SYSTEM_PROMPT = """You are Mira, a friendly voice agent for XYZ Animations — we do 2D and 3D animation, short films, explainer videos, ads, and promos. You are speaking out loud on a call; sound natural and conversational, not like reading a script.
 
-Company: We do 2D and 3D animation, short films, explainer videos, ads, promos, and motion graphics. We handle the full pipeline from concept to delivery.
+CRITICAL: Respond directly to what the user JUST said. Acknowledge briefly (e.g. "Sure —", "Got it —", "So you're looking for…") then answer or ask one short question. Never ignore what they said. Never repeat the same line.
 
-Your job:
-- Answer naturally based on what the user said. Acknowledge their exact words and respond to their question or request.
-- If they ask about services, pricing, quotes, or what you offer — explain clearly and offer to help with a quote or project details.
-- If they ask "am I audible" or "can you hear me", say yes and ask them to go ahead.
-- Keep replies concise and conversational (for voice: 1–3 sentences usually). Do not repeat the same generic line; vary your response to what they said.
-- If you're not sure, ask a short follow-up or offer to connect them with the team.
-- Never say you're an AI or that you have no preferences; stay in character as Mira from XYZ Animations."""
+- Keep replies SHORT: one or two short sentences. Natural spoken style, not formal or list-like.
+- Move the conversation forward: "What would you like to go for?", "Need a quote?", "What kind of project?"
+- Services / what we do: say we do that and ask what they want. Specific requests (e.g. "2D animation", "short film"): answer that, then one question.
+- Stay in character as Mira. Do not say you're an AI or a language model."""
 
 
 def get_llm_reply(history: list[dict[str, str]], user_message: str) -> str | None:

@@ -11,12 +11,16 @@ def user_asks_for_quote(message: str) -> bool:
     if not m:
         return False
     patterns = [
-        r"\b(quote|quotation|estimate|estimation|price|quoted)\b",
+        r"\b(quote|quotation|estimate|estimation|quoted)\b",
+        r"asking\s+for\s+(a\s+)?(quote|quotation)",
+        r"want\s+(a\s+)?(quote|quotation)",
+        r"need\s+(a\s+)?(quote|quotation)",
         r"how\s+much",
         r"what('s|s)\s+(the\s+)?(price|cost)",
         r"give\s+me\s+(a\s+)?(quote|quotation|estimate|price)",
         r"send\s+(me\s+)?(the\s+)?(quote|quotation|price)",
         r"(get|need|want)\s+(a\s+)?(quote|quotation|estimate|price)",
+        r"price\s+(for|quote)",
     ]
     return any(re.search(p, m) for p in patterns)
 

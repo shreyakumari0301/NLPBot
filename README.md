@@ -22,7 +22,9 @@ pip install -r requirements.txt
 uvicorn src.main:app --reload
 ```
 
-**Voice bot (call with Mira):** Set `OPENAI_API_KEY` so the bot uses LangChain + OpenAI to understand and reply to what you say instead of fixed prompts. Without it, the app falls back to rule-based replies.
+**Voice bot (call with Mira):** Set `OPENAI_API_KEY` so the bot uses LangChain + OpenAI to understand and reply. For **local LLM** set `USE_OLLAMA=1` and run `ollama run mistral` (or `OLLAMA_MODEL=llama3`).
+
+**Full-duplex voice agent (STT/TTS on server):** Install deps then use the "Use server STT+TTS" option on the call screen: records audio → `POST /live/audio` (faster-whisper + turn + optional TTS) → play reply. See `VOICE_AGENT.md` for VAD, interrupt, and Coqui XTTS.
 
 - **POST /ingest/chat** — Send text chat (body: `{ "turns": [ { "speaker_id": "user", "text": "Hello" } ], "conversation_id": null }`).
 - **POST /ingest/voice** — Send voice (body: `{ "transcript": "Pre-transcribed text" }` or `{ "audio_url": "https://..." }`).

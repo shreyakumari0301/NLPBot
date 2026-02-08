@@ -1,13 +1,16 @@
 """FAQ for General Services Query — conversational answers about company, services, process."""
 
 SERVICES_ANSWER = (
-    "We provide 2D, 3D, explainer videos, ads, and full animated films. "
-    "Would you like details on any specific service?"
+    "We do 2D and 3D animation, short films, explainer videos, and ads. "
+    "What kind of project would you like to go for?"
+)
+SERVICES_ANSWER_ALT = (
+    "We take on such projects — animation, promos, short films. "
+    "Do you have something in mind, or would you like a quote?"
 )
 COMPANY_ANSWER = (
-    "XYZ Animations is an animation and video production studio. "
-    "We do 2D and 3D animation, short films, promos, ads, and motion graphics — "
-    "from concept to delivery. What would you like to know more about?"
+    "We're an animation and video studio — 2D, 3D, short films, ads. "
+    "What would you like to go for?"
 )
 PROCESS_ANSWER = (
     "Our process: brief and concept, script and storyboard, style and asset design, "
@@ -45,3 +48,13 @@ def get_faq_reply(user_message: str) -> str | None:
     if any(k in msg for k in SERVICES_KEYWORDS):
         return SERVICES_ANSWER
     return SERVICES_ANSWER
+
+
+def get_faq_reply_varied(user_message: str, turn_index: int = 0) -> str | None:
+    """Same as get_faq_reply but picks an alternate when available so we don't repeat."""
+    base = get_faq_reply(user_message)
+    if not base:
+        return None
+    if base == SERVICES_ANSWER and turn_index % 2 == 1:
+        return SERVICES_ANSWER_ALT
+    return base
