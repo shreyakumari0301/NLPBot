@@ -16,9 +16,22 @@ def _get_chat():
         return None
     if _chat is not None:
         return _chat
+    # 1) Prefer local Ollama (Mistral / LLaMA-3 / Phi-3)
+    if os.environ.get("USE_OLLAMA", "").lower() in ("1", "true", "yes"):
+        try:
+            from langchain_community.chat_models import ChatOllama
+
+            _chat = ChatOllama(
+                model=os.environ.get("OLLAMA_MODEL", "mistral"),
+                temperature=0.7,
+            )
+            _llm_available = True
+            return _chat
+        except Exception:
+            pass
+    # 2) OpenAI (gpt-4o-mini)
     try:
         from langchain_openai import ChatOpenAI
-        from langchain_core.messages import HumanMessage, SystemMessage
 
         key = os.environ.get("OPENAI_API_KEY")
         if not key:
@@ -61,7 +74,7 @@ def get_llm_reply(history: list[dict[str, str]], user_message: str) -> str | Non
     if not (user_message or "").strip():
         return None
     try:
-        from langchain_core.messages import AIMessage, HumanMessage
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
         messages = [SystemMessage(content=SYSTEM_PROMPT)]
         for h in history:

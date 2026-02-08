@@ -118,12 +118,27 @@ def turn(session_id: str, user_message: str) -> tuple[str, ConversationState, st
     intent = intent_result.primary_intent
     confidence = intent_result.confidence
 
-    # Sim 4 – Unknown/chitchat → intent clarification
+    # Sim 4 – Unknown/chitchat: short greeting → brief reply; else try FAQ, then varied clarification
     if intent == "unknown_chitchat":
+        _m = _msg.strip()
+        if _m in ("hi", "hello", "hey", "hi there", "hello there") or len(_m.split()) <= 2 and any(g in _m for g in ("hi", "hello", "hey")):
+            reply = "Hi! What can I help you with?"
+        else:
+            faq = get_faq_reply(user_message)
+            if faq:
+                reply = faq
+            else:
+                _clarify = (
+                    "What can I help you with today — a quote, our services, or something else?",
+                    "I'd love to help. Are you looking for animation work, a price, or general info?",
+                    "How can I help you — quote, 2D/3D work, or something else?",
+                )
+                reply = _clarify[turn_index % len(_clarify)]
         data["history"].append({"role": "user", "text": user_message})
-        data["history"].append({"role": "bot", "text": UNKNOWN_CLARIFY})
+        data["history"].append({"role": "bot", "text": reply})
         data["turn_index"] = turn_index + 1
-        return UNKNOWN_CLARIFY, state, intent
+        _sessions[session_id] = data
+        return reply, state, intent
 
     # Sim 2 – General services query → "Sure, go ahead" if interrupted mid-flow, else FAQ
     if intent == "general_services_query":
